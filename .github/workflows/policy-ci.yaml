@@ -4,6 +4,8 @@ on:
     paths:
       - 'test-fixtures/**'
       - 'policies/**'
+      - '*.json'
+      - '*.yaml'
 
 permissions:
   contents: read
