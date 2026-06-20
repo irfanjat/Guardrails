@@ -1,0 +1,114 @@
+{
+  "format_version": "1.0",
+  "terraform_version": "1.5.0",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.public_data",
+      "type": "aws_s3_bucket",
+      "name": "public_data",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "my-company-public-bucket",
+          "acl": "public-read",
+          "tags": {
+            "Name": "PublicBucket"
+          },
+          "server_side_encryption_configuration": null,
+          "block_public_acls": null
+        },
+        "after_unknown": {
+          "id": true,
+          "arn": true,
+          "block_public_acls": true
+        }
+      }
+    },
+    {
+      "address": "aws_security_group.open_ssh",
+      "type": "aws_security_group",
+      "name": "open_ssh",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "open-ssh-sg",
+          "description": "Managed by Terraform",
+          "ingress": [
+            {
+              "from_port": 22,
+              "to_port": 22,
+              "protocol": "tcp",
+              "cidr_blocks": ["0.0.0.0/0"],
+              "description": "SSH from anywhere"
+            }
+          ],
+          "tags": {
+            "Name": "OpenSSH"
+          }
+        },
+        "after_unknown": {
+          "id": true,
+          "arn": true,
+          "ingress": [
+            {
+              "description": false,
+              "ipv6_cidr_blocks": true,
+              "prefix_list_ids": true,
+              "self": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "aws_db_instance.main",
+      "type": "aws_db_instance",
+      "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "engine": "mysql",
+          "password": "hunter2!",
+          "storage_encrypted": false,
+          "tags": {
+            "Name": "MainDB"
+          }
+        },
+        "after_unknown": {
+          "id": true,
+          "arn": true,
+          "address": true,
+          "endpoint": true
+        }
+      }
+    },
+    {
+      "address": "aws_ebs_volume.data",
+      "type": "aws_ebs_volume",
+      "name": "data",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "size": 100,
+          "encrypted": false,
+          "tags": {
+            "Name": "DataVolume"
+          }
+        },
+        "after_unknown": {
+          "id": true,
+          "arn": true,
+          "availability_zone": true
+        }
+      }
+    }
+  ]
+}

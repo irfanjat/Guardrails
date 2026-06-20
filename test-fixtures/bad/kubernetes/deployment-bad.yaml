@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bad-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bad-app
+  template:
+    metadata:
+      labels:
+        app: bad-app
+    spec:
+      serviceAccountName: default
+      containers:
+        - name: app
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          env:
+            - name: DB_PASSWORD
+              value: "SuperSecret123"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-pod
+  namespace: default
+  labels:
+    app: bad-app
+spec:
+  serviceAccountName: default
+  containers:
+    - name: app
+      image: nginx:latest
+      ports:
+        - containerPort: 80
+      securityContext:
+        privileged: true
+        runAsUser: 0
+      env:
+        - name: DB_PASSWORD
+          value: "SuperSecret123"

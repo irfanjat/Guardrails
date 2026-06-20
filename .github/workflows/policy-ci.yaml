@@ -1,0 +1,155 @@
+name: Policy Guardrails
+on:
+  pull_request:
+    paths:
+      - 'test-fixtures/**'
+      - 'policies/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  policy-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Conftest
+        run: |
+          curl -sSLfo conftest.tar.gz \
+            https://github.com/open-policy-agent/conftest/releases/download/v0.58.0/conftest_0.58.0_Linux_x86_64.tar.gz
+          tar xzf conftest.tar.gz
+          sudo mv conftest /usr/local/bin/conftest
+          conftest --version
+
+      - name: Install Kyverno CLI
+        run: |
+          curl -sSLfo kyverno.tar.gz \
+            https://github.com/kyverno/kyverno/releases/download/v1.13.3/kyverno-cli_v1.13.3_linux_x86_64.tar.gz
+          tar xzf kyverno.tar.gz
+          sudo mv kyverno /usr/local/bin/kyverno
+          kyverno version
+
+      - name: Get changed files from PR
+        id: changed-files
+        run: |
+          echo "Base ref: ${{ github.base_ref }}"
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git diff --name-only "origin/${{ github.base_ref }}...HEAD" > changed-files.txt
+          echo "Changed files:"
+          cat changed-files.txt
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run Conftest on Terraform plan files
+        id: conftest-check
+        continue-on-error: true
+        run: |
+          set +e
+          violations=""
+          while IFS= read -r file; do
+            if [[ "$file" == *.json ]]; then
+              echo "=== Checking $file with Conftest ==="
+              output=$(conftest test --policy policies/terraform/ "$file" 2>&1)
+              exit_code=$?
+              echo "$output"
+              if [ $exit_code -ne 0 ]; then
+                violations+="**File: $file**\n\`\`\`\n$output\n\`\`\`\n\n"
+              fi
+            fi
+          done < changed-files.txt
+          if [ -n "$violations" ]; then
+            echo "VIOLATIONS<<EOF" >> "$GITHUB_ENV"
+            echo -e "$violations" >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
+            echo "violations_found=terraform" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Terraform plan violations."
+          fi
+
+      - name: Run Kyverno on Kubernetes manifests
+        id: kyverno-check
+        continue-on-error: true
+        run: |
+          set +e
+          violations=""
+          while IFS= read -r file; do
+            if [[ "$file" == *.yaml ]] || [[ "$file" == *.yml ]]; then
+              echo "=== Checking $file with Kyverno ==="
+              output=$(kyverno apply policies/kubernetes/ --resource="$file" 2>&1)
+              exit_code=$?
+              echo "$output"
+              if [ $exit_code -ne 0 ]; then
+                violations+="**File: $file**\n\`\`\`\n$output\n\`\`\`\n\n"
+              elif echo "$output" | grep -qi "fail"; then
+                violations+="**File: $file**\n\`\`\`\n$output\n\`\`\`\n\n"
+              fi
+            fi
+          done < changed-files.txt
+          if [ -n "$violations" ]; then
+            echo "VIOLATIONS<<EOF" >> "$GITHUB_ENV"
+            echo -e "$violations" >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
+            if [ "${{ steps.conftest-check.outputs.violations_found }}" == "terraform" ]; then
+              echo "violations_found=both" >> "$GITHUB_OUTPUT"
+            else
+              echo "violations_found=kubernetes" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Run policy unit tests (self-test)
+        id: unit-tests
+        continue-on-error: true
+        run: |
+          echo "=== Running Conftest unit tests ==="
+          conftest verify --policy policies/terraform/ || true
+          echo ""
+          echo "=== Running Kyverno policy tests ==="
+          kyverno test tests/kyverno-test.yaml || true
+
+      - name: Post PR comment on violation
+        if: env.VIOLATIONS != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const violations = process.env.VIOLATIONS;
+            const body = `## 🚫 Policy Violations Detected
+
+            The following compliance policies were violated by your changes:
+
+            ${violations}
+
+            ---
+            ### 🔧 How to fix
+
+            | Policy | How to resolve |
+            |--------|---------------|
+            | Public S3 bucket | Set \`acl = "private"\` and enable \`block_public_acls\` |
+            | Open security group | Restrict \`cidr_blocks\` to specific IP ranges, never \`0.0.0.0/0\` for sensitive ports |
+            | Missing tags | Add \`CostCenter\`, \`Environment\`, and \`Owner\` tags to all taggable resources |
+            | No encryption | Enable \`server_side_encryption_configuration\` on S3, \`storage_encrypted\` on RDS, \`encrypted\` on EBS |
+            | Hardcoded secrets | Use Terraform variables marked \`sensitive = true\` or a secret store like AWS Secrets Manager |
+            | Missing resource limits | Add \`resources.requests\` and \`resources.limits\` (cpu + memory) to every container |
+            | Container running as root | Set \`securityContext.runAsNonRoot: true\` and \`runAsUser > 0\` |
+            | Privileged container | Set \`securityContext.privileged: false\` or remove the field |
+
+            Please fix these issues and push a new commit.`;
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail pipeline on violation
+        if: env.VIOLATIONS != ''
+        run: |
+          echo "❌ Policy violations detected. Failing build."
+          echo "$VIOLATIONS"
+          exit 1
+
+      - name: Pass pipeline
+        if: env.VIOLATIONS == ''
+        run: echo "✅ All policy checks passed."

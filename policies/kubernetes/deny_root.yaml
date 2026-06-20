@@ -1,0 +1,33 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: deny-root-containers
+  annotations:
+    policies.kyverno.io/title: Deny Containers Running as Root
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Containers running as root have full capabilities on the host kernel
+      if they escape the container runtime. This has been the root cause of
+      numerous container escape CVEs (e.g., CVE-2019-5736, CVE-2022-0185).
+      All containers must set runAsNonRoot: true or runAsUser > 0.
+spec:
+  validationFailureAction: enforce
+  background: true
+  rules:
+    - name: check-run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: >-
+          Container is running as root (or runAsNonRoot is not set).
+          Running as root is the #1 cause of container escape vulnerabilities.
+          Set securityContext.runAsNonRoot: true or runAsUser to a non-zero UID.
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  runAsNonRoot: true

@@ -1,0 +1,120 @@
+{
+  "format_version": "1.0",
+  "terraform_version": "1.5.0",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.private_data",
+      "type": "aws_s3_bucket",
+      "name": "private_data",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "my-company-private-bucket",
+          "acl": "private",
+          "block_public_acls": true,
+          "tags": {
+            "Name": "PrivateBucket",
+            "CostCenter": "12345",
+            "Environment": "production",
+            "Owner": "platform-team"
+          },
+          "server_side_encryption_configuration": {
+            "rule": {
+              "apply_server_side_encryption_by_default": {
+                "sse_algorithm": "AES256"
+              }
+            }
+          }
+        },
+        "after_unknown": {
+          "id": true,
+          "arn": true
+        }
+      }
+    },
+    {
+      "address": "aws_security_group.restricted_ssh",
+      "type": "aws_security_group",
+      "name": "restricted_ssh",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "restricted-ssh-sg",
+          "description": "Managed by Terraform",
+          "ingress": [
+            {
+              "from_port": 22,
+              "to_port": 22,
+              "protocol": "tcp",
+              "cidr_blocks": ["10.0.0.0/8"],
+              "description": "SSH from internal network only"
+            }
+          ],
+          "tags": {
+            "Name": "RestrictedSSH",
+            "CostCenter": "12345",
+            "Environment": "production",
+            "Owner": "platform-team"
+          }
+        },
+        "after_unknown": {
+          "id": true,
+          "arn": true
+        }
+      }
+    },
+    {
+      "address": "aws_db_instance.main",
+      "type": "aws_db_instance",
+      "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "engine": "mysql",
+          "password": "***",
+          "storage_encrypted": true,
+          "tags": {
+            "Name": "MainDB",
+            "CostCenter": "12345",
+            "Environment": "production",
+            "Owner": "platform-team"
+          }
+        },
+        "after_unknown": {
+          "id": true,
+          "arn": true
+        }
+      }
+    },
+    {
+      "address": "aws_ebs_volume.data",
+      "type": "aws_ebs_volume",
+      "name": "data",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "size": 100,
+          "encrypted": true,
+          "tags": {
+            "Name": "DataVolume",
+            "CostCenter": "12345",
+            "Environment": "production",
+            "Owner": "platform-team"
+          }
+        },
+        "after_unknown": {
+          "id": true,
+          "arn": true
+        }
+      }
+    }
+  ]
+}
